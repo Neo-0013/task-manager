@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}Add Task - Task Manager{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">Add a New Task</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST" id="taskForm">
+                    <div class="mb-3">
+                        <label for="title" class="form-label">Task Title</label>
+                        <input type="text" class="form-control" id="title" name="title" required>
+                        <div class="invalid-feedback">Please enter a task title.</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea class="form-control" id="description" name="description" rows="3" placeholder="Add any details that help you complete this task."></textarea>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="priority" class="form-label">Priority</label>
+                            <select class="form-select" id="priority" name="priority">
+                                <option value="3">High</option>
+                                <option value="2" selected>Medium</option>
+                                <option value="1">Low</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="category" class="form-label">Category</label>
+                            <input type="text" class="form-control" id="category" name="category" placeholder="e.g. Work, Personal">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="due_date" class="form-label">Due Date &amp; Time</label>
+                            <input type="datetime-local" class="form-control" id="due_date" name="due_date">
+                            <div class="form-text">Optional, but helps power your dashboard and profile graphs.</div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2 mt-3">
+                        <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-success">Add Task</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Simple client-side validation
+    document.addEventListener('DOMContentLoaded', function () {
+        const form = document.getElementById('taskForm');
+        const titleInput = document.getElementById('title');
+
+        form.addEventListener('submit', function (event) {
+            if (!titleInput.value.trim()) {
+                event.preventDefault();
+                titleInput.classList.add('is-invalid');
+            } else {
+                titleInput.classList.remove('is-invalid');
+            }
+        });
+    });
+</script>
+{% endblock %}

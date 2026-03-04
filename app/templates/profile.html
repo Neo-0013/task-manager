@@ -1,0 +1,316 @@
+{% extends "base.html" %}
+
+{% block title %}Profile - Task Manager{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h2>Your Productivity Overview</h2>
+        <p class="text-muted mb-0">See how you’ve been progressing with your tasks over time.</p>
+    </div>
+</div>
+
+<!-- Summary + Gamification Cards -->
+<div class="row mb-4">
+    <div class="col-md-3 mb-3">
+        <div class="card text-center shadow-sm stat-card">
+            <div class="card-body">
+                <h6 class="text-muted mb-1 text-uppercase small">Total Tasks</h6>
+                <h3 class="mb-0">{{ stats.total }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card text-center shadow-sm stat-card">
+            <div class="card-body">
+                <h6 class="text-muted mb-1 text-uppercase small">Completed</h6>
+                <h3 class="text-success mb-0">{{ stats.completed }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card text-center shadow-sm stat-card">
+            <div class="card-body">
+                <h6 class="text-muted mb-1 text-uppercase small">Current Streak</h6>
+                <h3 class="mb-0">{{ stats.streak_days }}<span class="fs-6 text-muted"> day{{  's' if stats.streak_days != 1 }}</span></h3>
+                <div class="small text-muted">Keep completing at least one task a day.</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card text-center shadow-sm stat-card">
+            <div class="card-body">
+                <h6 class="text-muted mb-1 text-uppercase small">Level</h6>
+                <h4 class="mb-1">{{ stats.level }}</h4>
+                {% if stats.next_level_at %}
+                    {% set progress_to_next = (stats.completed / stats.next_level_at * 100) if stats.next_level_at else 0 %}
+                    <div class="progress" style="height: 8px;">
+                        <div class="progress-bar bg-success" role="progressbar"
+                             style="width: {{ progress_to_next|round(0) }}%;"></div>
+                    </div>
+                    <div class="small text-muted mt-1">
+                        {{ stats.next_level_at - stats.completed if stats.next_level_at > stats.completed else 0 }} task(s) to next level.
+                    </div>
+                {% else %}
+                    <div class="small text-muted">Max level reached 🎉</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Charts -->
+    <div class="col-lg-7 mb-4">
+        <div class="card mb-4 shadow-sm">
+            <div class="card-header">
+                <strong>Task Distribution</strong>
+            </div>
+            <div class="card-body">
+                <canvas id="progressChart" height="200"></canvas>
+            </div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-header">
+                <strong>Completion Over Time</strong>
+            </div>
+            <div class="card-body">
+                <canvas id="historyChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Calendar -->
+    <div class="col-lg-5 mb-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <strong>Completion Calendar</strong>
+                <div>
+                    <button class="btn btn-sm btn-outline-secondary" id="prevMonthBtn" title="Previous month">&lt;</button>
+                    <button class="btn btn-sm btn-outline-secondary" id="nextMonthBtn" title="Next month">&gt;</button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="calendarHeader" class="text-center fw-bold mb-2"></div>
+                <div class="small text-muted mb-2">
+                    Click highlighted days to see what you completed.
+                </div>
+                <div id="calendarGrid" class="calendar-grid mb-3"></div>
+                <div id="calendarSummary" class="small text-muted mb-2"></div>
+                <div id="calendarDetails" class="small"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .calendar-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 4px;
+    }
+    .calendar-cell {
+        padding: 6px 0;
+        text-align: center;
+        border-radius: 4px;
+        font-size: 0.8rem;
+    }
+    .calendar-cell.header {
+        font-weight: 600;
+        color: #6c757d;
+    }
+    .calendar-cell.day {
+        background-color: #f8f9fa;
+    }
+    .calendar-cell.today {
+        border: 1px solid #0d6efd;
+    }
+    .calendar-cell.completed {
+        background-color: #d1e7dd;
+        color: #0f5132;
+        font-weight: 600;
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const historyData = {{ stats.history | tojson }};
+        const dayTasks = {{ day_tasks | tojson }};
+
+        // ---------- Charts ----------
+        const progressCtx = document.getElementById('progressChart');
+        if (progressCtx) {
+            new Chart(progressCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Completed', 'Pending', 'Overdue'],
+                    datasets: [{
+                        data: [{{ stats.completed }}, {{ stats.pending }}, {{ stats.overdue }}],
+                        backgroundColor: ['#198754', '#ffc107', '#dc3545']
+                    }]
+                },
+                options: {
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    }
+                }
+            });
+        }
+
+        const historyCtx = document.getElementById('historyChart');
+        if (historyCtx) {
+            new Chart(historyCtx, {
+                type: 'line',
+                data: {
+                    labels: historyData.map(h => h.date),
+                    datasets: [{
+                        label: 'Tasks completed',
+                        data: historyData.map(h => h.completed),
+                        borderColor: '#0d6efd',
+                        backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                        fill: true,
+                        tension: 0.2
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            precision: 0
+                        }
+                    }
+                }
+            });
+        }
+
+        // ---------- Calendar ----------
+        const completionByDate = {};
+        historyData.forEach(h => {
+            completionByDate[h.date] = h.completed;
+        });
+
+        const calendarHeader = document.getElementById('calendarHeader');
+        const calendarGrid = document.getElementById('calendarGrid');
+        const calendarSummary = document.getElementById('calendarSummary');
+        const prevBtn = document.getElementById('prevMonthBtn');
+        const nextBtn = document.getElementById('nextMonthBtn');
+        const calendarDetails = document.getElementById('calendarDetails');
+
+        let currentMonth = new Date();
+
+        function renderCalendar(date) {
+            const year = date.getFullYear();
+            const month = date.getMonth(); // 0-based
+            const firstDay = new Date(year, month, 1);
+            const lastDay = new Date(year, month + 1, 0);
+            const startWeekday = firstDay.getDay(); // 0=Sun
+            const daysInMonth = lastDay.getDate();
+
+            const monthName = firstDay.toLocaleString('default', { month: 'long' });
+            calendarHeader.textContent = `${monthName} ${year}`;
+
+            calendarGrid.innerHTML = '';
+
+            const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            weekDays.forEach(d => {
+                const cell = document.createElement('div');
+                cell.textContent = d;
+                cell.className = 'calendar-cell header';
+                calendarGrid.appendChild(cell);
+            });
+
+            for (let i = 0; i < startWeekday; i++) {
+                const emptyCell = document.createElement('div');
+                emptyCell.className = 'calendar-cell';
+                calendarGrid.appendChild(emptyCell);
+            }
+
+            const today = new Date();
+            let monthTotal = 0;
+            let bestDay = null;
+            let bestCount = 0;
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                const cellDate = new Date(year, month, day);
+                const dateStr = cellDate.toISOString().slice(0, 10);
+                const completedCount = completionByDate[dateStr] || 0;
+
+                const cell = document.createElement('div');
+                cell.className = 'calendar-cell day';
+                cell.textContent = day;
+
+                if (completedCount > 0) {
+                    cell.classList.add('completed');
+                    cell.title = `${completedCount} task(s) completed`;
+                    monthTotal += completedCount;
+                    if (completedCount > bestCount) {
+                        bestCount = completedCount;
+                        bestDay = dateStr;
+                    }
+
+                    cell.addEventListener('click', () => {
+                        showDayDetails(dateStr, completedCount);
+                    });
+                }
+
+                if (
+                    cellDate.getFullYear() === today.getFullYear() &&
+                    cellDate.getMonth() === today.getMonth() &&
+                    cellDate.getDate() === today.getDate()
+                ) {
+                    cell.classList.add('today');
+                }
+
+                calendarGrid.appendChild(cell);
+            }
+
+            if (monthTotal > 0) {
+                calendarSummary.textContent = `${monthTotal} task(s) completed this month.`;
+                if (bestDay) {
+                    calendarSummary.textContent += ` Best day: ${bestDay} (${bestCount} tasks).`;
+                }
+            } else {
+                calendarSummary.textContent = 'No completed tasks in this month yet.';
+                if (calendarDetails) {
+                    calendarDetails.innerHTML = '';
+                }
+            }
+        }
+
+        function showDayDetails(dateStr, completedCount) {
+            if (!calendarDetails) return;
+            const items = dayTasks[dateStr] || [];
+            if (!items.length) {
+                calendarDetails.innerHTML = `<span class="text-muted">Completed ${completedCount} task(s), details not available.</span>`;
+                return;
+            }
+            const list = items.map(t => {
+                const category = t.category ? ` • <span class="badge bg-info text-dark">${t.category}</span>` : '';
+                return `<li>${t.title}${category} <span class="badge bg-light text-dark border ms-1">${t.priority}</span></li>`;
+            }).join('');
+            calendarDetails.innerHTML = `
+                <div class="fw-semibold mb-1">Tasks completed on ${dateStr}</div>
+                <ul class="mb-0 ps-3">
+                    ${list}
+                </ul>
+            `;
+        }
+
+        if (prevBtn && nextBtn) {
+            prevBtn.addEventListener('click', function () {
+                currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1);
+                renderCalendar(currentMonth);
+            });
+
+            nextBtn.addEventListener('click', function () {
+                currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1);
+                renderCalendar(currentMonth);
+            });
+        }
+
+        renderCalendar(currentMonth);
+    });
+</script>
+
+{% endblock %}

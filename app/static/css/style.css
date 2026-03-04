@@ -1,0 +1,280 @@
+/* Custom styles for Task Manager */
+
+:root {
+    --primary-color: #0d6efd;
+    --primary-dark: #050816;
+    --primary-soft: #111827;
+    --accent-purple: #9b5cff;
+    --accent-cyan: #0dcaf0;
+    --success-color: #1dd1a1;
+    --danger-color: #ff6b6b;
+    --warning-color: #ffc107;
+    --info-color: #0dcaf0;
+    --surface-elevated: rgba(15, 23, 42, 0.96);
+    --surface-muted: rgba(17, 24, 39, 0.92);
+    --border-subtle: rgba(148, 163, 184, 0.2);
+}
+
+body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: radial-gradient(circle at top left, #1d2665 0, #050816 40%, #020617 100%);
+    color: #e5e7eb;
+}
+
+main {
+    flex: 1;
+}
+
+/* NAVBAR */
+.navbar-main {
+    background: linear-gradient(90deg, #050816, #111827, #050816);
+    border-bottom: 1px solid rgba(148, 163, 184, 0.3);
+    backdrop-filter: blur(18px);
+}
+
+.navbar-main .nav-link {
+    font-weight: 500;
+    color: rgba(226, 232, 240, 0.85) !important;
+}
+
+.navbar-main .nav-link:hover,
+.navbar-main .nav-link.active {
+    color: #ffffff !important;
+    text-shadow: 0 0 10px rgba(129, 140, 248, 0.7);
+}
+
+.navbar-main .navbar-brand {
+    font-weight: 600;
+    font-size: 1.25rem;
+    transition: transform 0.25s ease;
+}
+
+.navbar-main .navbar-brand:hover {
+    transform: translateY(-1px) scale(1.02);
+}
+
+/* SURFACES */
+.card {
+    background: radial-gradient(circle at top left, rgba(129, 140, 248, 0.18), transparent 55%),
+                linear-gradient(145deg, var(--surface-elevated), var(--surface-muted));
+    border-radius: 18px;
+    border: 1px solid var(--border-subtle);
+    box-shadow: 0 18px 45px rgba(15, 23, 42, 0.9);
+    color: #e5e7eb;
+}
+
+.card-header {
+    border-bottom-color: rgba(148, 163, 184, 0.3);
+}
+
+.table {
+    color: #e5e7eb;
+}
+
+.table thead th {
+    border-bottom-color: rgba(148, 163, 184, 0.35);
+}
+
+.table tbody tr {
+    border-color: rgba(148, 163, 184, 0.2);
+}
+
+.table tbody tr.table-success {
+    background-color: rgba(34, 197, 94, 0.14) !important;
+}
+
+.table tbody tr.table-danger {
+    background-color: rgba(248, 113, 113, 0.14) !important;
+}
+
+/* Stat Cards Animation */
+.stat-card {
+    transition: all 0.25s ease;
+    cursor: pointer;
+}
+
+.stat-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 22px 55px rgba(15, 23, 42, 0.95);
+}
+
+/* Task Cards */
+.task-card {
+    transition: all 0.25s ease;
+    border-left: 4px solid transparent;
+}
+
+.task-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.9);
+}
+
+.task-card.border-success {
+    border-left-color: var(--success-color) !important;
+    background-color: rgba(16, 185, 129, 0.05);
+}
+
+.task-card.border-danger {
+    border-left-color: var(--danger-color) !important;
+    background-color: rgba(248, 113, 113, 0.05);
+}
+
+/* Badges */
+.badge {
+    font-size: 0.8rem;
+    padding: 0.4em 0.7em;
+    font-weight: 500;
+}
+
+/* Progress Bar Animation */
+.progress-bar {
+    transition: width 0.6s ease;
+    background-image: linear-gradient(90deg, var(--accent-purple), var(--accent-cyan));
+}
+
+/* Search Input */
+#searchInput {
+    border: 2px solid rgba(148, 163, 184, 0.35);
+    background-color: rgba(15, 23, 42, 0.85);
+    color: #e5e7eb;
+    transition: all 0.3s ease;
+}
+
+#searchInput:focus {
+    border-color: var(--accent-purple);
+    box-shadow: 0 0 0 0.18rem rgba(129, 140, 248, 0.45);
+}
+
+/* Button Hover Effects */
+.btn {
+    transition: all 0.18s ease;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 26px rgba(15, 23, 42, 0.8);
+}
+
+.btn:active {
+    transform: translateY(0);
+}
+
+/* Footer */
+footer {
+    margin-top: auto;
+    background: radial-gradient(circle at top, rgba(15, 23, 42, 0.98), #020617);
+    color: #9ca3af;
+    box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.9);
+}
+
+/* Task Description Toggle */
+.toggle-description {
+    text-decoration: none;
+    color: var(--primary-color);
+    font-size: 0.85rem;
+}
+
+.toggle-description:hover {
+    text-decoration: underline;
+}
+
+/* Empty State */
+#emptyState svg {
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%, 100% {
+        transform: translateY(0px);
+    }
+    50% {
+        transform: translateY(-10px);
+    }
+}
+
+/* Loading Animation */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.loading {
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid var(--primary-color);
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+    margin: 20px auto;
+}
+
+/* Alert Animations */
+.alert {
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateY(-20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* Keyboard Shortcut Hint */
+kbd {
+    background-color: #212529;
+    border-radius: 3px;
+    border: 1px solid #495057;
+    box-shadow: 0 2px 0 rgba(0, 0, 0, 0.2);
+    color: #fff;
+    display: inline-block;
+    font-size: 0.85em;
+    line-height: 1;
+    padding: 2px 6px;
+    white-space: nowrap;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .btn-group {
+        flex-direction: column;
+    }
+    
+    .btn-group .btn,
+    .btn-group form {
+        width: 100%;
+        border-radius: 0.25rem !important;
+        margin-bottom: 0.25rem;
+    }
+    
+    .stat-card {
+        margin-bottom: 1rem;
+    }
+    
+    h2 {
+        font-size: 1.5rem;
+    }
+}
+
+/* Print Styles */
+@media print {
+    .no-print {
+        display: none !important;
+    }
+    
+    .task-card {
+        page-break-inside: avoid;
+    }
+}
+
+/* Dark Mode Preparation (for future) */
+@media (prefers-color-scheme: dark) {
+    /* Can add dark mode styles here later */
+}
+

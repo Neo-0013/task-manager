@@ -1,0 +1,371 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Task Manager{% endblock %}
+
+{% block content %}
+<div class="dashboard-shell d-flex">
+    <!-- Sidebar -->
+    <aside class="dashboard-sidebar d-none d-md-flex flex-column align-items-center py-4">
+        <div class="sidebar-logo mb-4">
+            <span class="logo-mark">D</span>
+        </div>
+        <nav class="sidebar-nav d-flex flex-column align-items-center gap-3">
+            <a href="{{ url_for('dashboard') }}" class="sidebar-icon active" title="Dashboard">
+                <span class="bi bi-grid-1x2-fill"></span>
+            </a>
+            <a href="{{ url_for('gantt_view') }}" class="sidebar-icon" title="Timeline">
+                <span class="bi bi-bar-chart-steps"></span>
+            </a>
+            <a href="{{ url_for('profile') }}" class="sidebar-icon" title="Profile">
+                <span class="bi bi-person-circle"></span>
+            </a>
+        </nav>
+        <div class="mt-auto sidebar-icon" title="Logout">
+            <a href="{{ url_for('logout') }}" class="text-decoration-none text-reset">
+                <span class="bi bi-box-arrow-right"></span>
+            </a>
+        </div>
+    </aside>
+
+    <!-- Main content -->
+    <div class="dashboard-main flex-grow-1">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2 class="dashboard-title mb-0">Dashboard</h2>
+                <p class="text-muted small mb-0">Overview of your tasks, notes, and schedule.</p>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <div class="d-none d-sm-flex align-items-center dashboard-search">
+                    <span class="bi bi-search text-muted ms-2"></span>
+                    <input type="text" class="form-control border-0 bg-transparent" placeholder="Search">
+                </div>
+                <a href="{{ url_for('add_task') }}" class="btn btn-primary rounded-pill">
+                    + New Task
+                </a>
+            </div>
+        </div>
+
+        <div class="row g-3 dashboard-grid">
+            <!-- Left column: recent tasks + stats -->
+            <div class="col-lg-4 d-flex flex-column gap-3">
+                <div class="card dashboard-card">
+                    <div class="card-header d-flex justify-content-between align-items-center border-0 bg-transparent pb-1">
+                        <span class="fw-semibold">Recent Tasks</span>
+                        <a href="{{ url_for('dashboard') }}" class="small text-decoration-none text-muted">All</a>
+                    </div>
+                    <div class="card-body pt-0">
+                        {% if tasks %}
+                            <ul class="list-unstyled mb-0 dashboard-task-list">
+                                {% for task in tasks[:5] %}
+                                <li class="d-flex justify-content-between align-items-center py-2">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <input type="checkbox" class="form-check-input"
+                                            {% if task.status == 'completed' %}checked{% endif %} disabled>
+                                        <div>
+                                            <div class="small fw-semibold {% if task.status == 'completed' %}text-decoration-line-through text-muted{% endif %}">
+                                                {{ task.title }}
+                                            </div>
+                                            {% if task.category %}
+                                                <div class="small text-muted">{{ task.category }}</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="text-end small text-muted">
+                                        {% if task.due_date %}
+                                            {{ task.due_date.strftime('%b %d') }}
+                                        {% else %}
+                                            No due
+                                        {% endif %}
+                                    </div>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <p class="text-muted small mb-0">No tasks yet. Create your first task to get started.</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                {% if stats.total > 0 %}
+                <div class="card dashboard-card">
+                    <div class="card-header border-0 bg-transparent pb-1 d-flex justify-content-between align-items-center">
+                        <span class="fw-semibold">Statistic</span>
+                        <span class="small text-muted">This week</span>
+                    </div>
+                    <div class="card-body pt-0">
+                        <canvas id="dashboardStatsChart" height="120"></canvas>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Middle column: folders + notes -->
+            <div class="col-lg-4 d-flex flex-column gap-3">
+                <div class="card dashboard-card">
+                    <div class="card-header border-0 bg-transparent pb-1 d-flex justify-content-between align-items-center">
+                        <span class="fw-semibold">Folders</span>
+                        <span class="small text-muted">All</span>
+                    </div>
+                    <div class="card-body pt-1">
+                        <div class="d-flex gap-3 flex-wrap">
+                            <div class="folder-pill">
+                                <div class="folder-icon work"></div>
+                                <div class="small mt-1">Work</div>
+                            </div>
+                            <div class="folder-pill">
+                                <div class="folder-icon personal"></div>
+                                <div class="small mt-1">Personal</div>
+                            </div>
+                            <div class="folder-pill">
+                                <div class="folder-icon study"></div>
+                                <div class="small mt-1">Study</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card dashboard-card flex-grow-1">
+                    <div class="card-header border-0 bg-transparent pb-1 d-flex justify-content-between align-items-center">
+                        <span class="fw-semibold">Notes</span>
+                        <span class="small text-muted">All</span>
+                    </div>
+                    <div class="card-body pt-1 small">
+                        <p class="text-muted mb-2">
+                            Tip: Use due dates and priorities to keep your week focused.
+                        </p>
+                        <p class="text-muted mb-2">
+                            You have <strong>{{ stats.pending }}</strong> pending and
+                            <strong>{{ stats.completed }}</strong> completed tasks.
+                        </p>
+                        <p class="text-muted mb-0">
+                            Capture quick notes here or in your tasks' descriptions to stay organized.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right column: mini calendar + today schedule -->
+            <div class="col-lg-4 d-flex flex-column gap-3">
+                <div class="card dashboard-card">
+                    <div class="card-header border-0 bg-transparent pb-1 d-flex justify-content-between align-items-center">
+                        <span class="fw-semibold">Today</span>
+                        <span class="small text-muted">{{ stats.completed }} done</span>
+                    </div>
+                    <div class="card-body pt-1">
+                        <!-- Reuse profile calendar by linking -->
+                        <p class="small text-muted mb-2">
+                            View your detailed completion calendar and streaks in <a href="{{ url_for('profile') }}">Profile</a>.
+                        </p>
+                        <div class="small">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span>Pending</span>
+                                <span>{{ stats.pending }}</span>
+                            </div>
+                            <div class="progress mb-2" style="height: 8px;">
+                                {% set total = stats.total if stats.total > 0 else 1 %}
+                                <div class="progress-bar bg-warning" style="width: {{ (stats.pending / total * 100)|round(0) }}%;"></div>
+                            </div>
+                            <div class="d-flex justify-content-between mb-1">
+                                <span>Completed</span>
+                                <span>{{ stats.completed }}</span>
+                            </div>
+                            <div class="progress" style="height: 8px;">
+                                <div class="progress-bar bg-success" style="width: {{ (stats.completed / total * 100)|round(0) }}%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Existing table view as compact list below -->
+                <div class="card shadow-sm mt-2" x-data="{
+        search: '',
+        statusFilter: 'all',
+        rowVisible(el) {
+            const title = (el.dataset.title || '').toLowerCase();
+            const status = el.dataset.status || '';
+            const matchesSearch = !this.search || title.includes(this.search.toLowerCase());
+            const matchesStatus = this.statusFilter === 'all' || status === this.statusFilter;
+            return matchesSearch && matchesStatus;
+        }
+    }">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <div class="d-flex flex-column flex-md-row align-items-md-center gap-2">
+            <div>
+                <strong>Tasks</strong>
+                <span class="text-muted small ms-2 d-none d-sm-inline">Interactive list with progress and status.</span>
+            </div>
+            <div class="input-group input-group-sm" style="max-width: 260px;">
+                <span class="input-group-text bg-white border-end-0">
+                    <span class="bi bi-search"></span>
+                </span>
+                <input type="text" class="form-control border-start-0" placeholder="Quick search tasks..."
+                       x-model="search">
+            </div>
+        </div>
+        <div class="btn-group btn-group-sm" role="group" aria-label="Views">
+            <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary active">List</a>
+            <a href="{{ url_for('gantt_view') }}" class="btn btn-outline-secondary">Gantt</a>
+            <a href="{{ url_for('profile') }}" class="btn btn-outline-secondary">Profile</a>
+        </div>
+    </div>
+    {% if tasks %}
+    <div class="table-responsive">
+        <table class="table mb-0 align-middle">
+            <thead class="table-light align-middle">
+                <tr>
+                    <th style="width: 40px;">#</th>
+                    <th>Task</th>
+                    <th style="width: 110px;">
+                        Status
+                        <div class="mt-1">
+                            <select class="form-select form-select-sm" x-model="statusFilter">
+                                <option value="all">All</option>
+                                <option value="pending">Pending</option>
+                                <option value="in_progress">In Progress</option>
+                                <option value="completed">Completed</option>
+                            </select>
+                        </div>
+                    </th>
+                    <th style="width: 90px;">Priority</th>
+                    <th style="width: 130px;">% Complete</th>
+                    <th style="width: 140px;">Due</th>
+                    <th style="width: 200px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for task in tasks %}
+                <tr class="{% if task.status == 'completed' %}table-success{% elif task.is_overdue %}table-danger{% endif %}"
+                    data-title="{{ task.title|lower }}"
+                    data-status="{{ task.status }}"
+                    x-show="rowVisible($el)"
+                    x-transition.opacity>
+                    <td class="text-muted small">{{ loop.index }}</td>
+                    <td>
+                        <div class="fw-semibold">
+                            {% if task.status == 'completed' %}
+                                <s>{{ task.title }}</s>
+                            {% else %}
+                                {{ task.title }}
+                            {% endif %}
+                            {% if task.is_milestone %}
+                                <span class="badge bg-purple ms-1">Milestone</span>
+                            {% endif %}
+                        </div>
+                        {% if task.description %}
+                        <div class="small text-muted">
+                            {{ task.description[:80] }}{% if task.description|length > 80 %}...{% endif %}
+                        </div>
+                        {% endif %}
+                        {% if task.category %}
+                        <div class="small">
+                            <span class="badge bg-info">{{ task.category }}</span>
+                        </div>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if task.status == 'pending' %}
+                            <span class="badge bg-warning text-dark">Pending</span>
+                        {% elif task.status == 'in_progress' %}
+                            <span class="badge bg-primary">In Progress</span>
+                        {% elif task.status == 'completed' %}
+                            <span class="badge bg-success">Completed</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if task.priority == 3 %}
+                            <span class="badge bg-danger">High</span>
+                        {% elif task.priority == 2 %}
+                            <span class="badge bg-warning text-dark">Medium</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Low</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="progress" style="height: 18px;">
+                            <div class="progress-bar" role="progressbar"
+                                 style="width: {{ task.percent_complete or 0 }}%;"
+                                 aria-valuenow="{{ task.percent_complete or 0 }}"
+                                 aria-valuemin="0"
+                                 aria-valuemax="100">
+                                <span class="small">{{ task.percent_complete or 0 }}%</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        {% if task.due_date %}
+                            <div class="small text-muted">
+                                {{ task.due_date.strftime('%Y-%m-%d') }}<br>
+                                {{ task.due_date.strftime('%H:%M') }}
+                                {% if task.is_overdue %}
+                                    <span class="text-danger d-block">Overdue</span>
+                                {% endif %}
+                            </div>
+                        {% else %}
+                            <span class="text-muted small">No due date</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="d-flex gap-1">
+                            <form method="POST" action="{{ url_for('toggle_task_status', task_id=task.id) }}">
+                                <button type="submit" class="btn btn-sm {% if task.status == 'completed' %}btn-outline-secondary{% else %}btn-success{% endif %}">
+                                    {% if task.status == 'completed' %}
+                                        Reopen
+                                    {% else %}
+                                        Complete
+                                    {% endif %}
+                                </button>
+                            </form>
+                            <a href="{{ url_for('edit_task', task_id=task.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
+                            <form method="POST" action="{{ url_for('delete_task', task_id=task.id) }}" onsubmit="return confirm('Delete this task?')">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="card-body">
+        <div class="text-center py-4">
+            <h4 class="text-muted">No tasks found</h4>
+            <p class="text-muted">Create your first task to get started!</p>
+            <a href="{{ url_for('add_task') }}" class="btn btn-primary">Create Task</a>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const ctx = document.getElementById('dashboardStatsChart');
+        if (!ctx) return;
+
+        const data = {
+            labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+            datasets: [{
+                label: 'Tasks completed',
+                data: [3, 4, 2, 5, 3, 1, 0],
+                fill: true,
+                backgroundColor: 'rgba(79, 193, 189, 0.25)',
+                borderColor: '#4fc1bd',
+                tension: 0.4,
+            }]
+        };
+
+        new Chart(ctx, {
+            type: 'line',
+            data,
+            options: {
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { grid: { display: false } },
+                    y: { display: false }
+                }
+            }
+        });
+    });
+</script>
+
+{% endblock %}

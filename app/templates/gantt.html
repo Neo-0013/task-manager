@@ -1,0 +1,344 @@
+{% extends "base.html" %}
+
+{% block title %}Gantt View - Task Manager{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col">
+        <h2>Project Timeline</h2>
+        <p class="text-muted mb-0">Visualize tasks, milestones, and dependencies.</p>
+    </div>
+</div>
+
+{% if not tasks %}
+    <div class="alert alert-info">
+        No tasks yet. Create a few tasks with due dates to see them on the Gantt chart.
+    </div>
+{% else %}
+    <div class="card shadow-sm mb-3">
+        <div class="card-body">
+            <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <span class="badge bg-secondary me-1">FS</span> <span class="small text-muted me-2">Finish → Start</span>
+                    <span class="badge bg-primary me-1">SS</span> <span class="small text-muted me-2">Start → Start</span>
+                    <span class="badge bg-warning text-dark me-1">SF</span> <span class="small text-muted me-2">Start → Finish</span>
+                    <span class="badge bg-success me-1">FF</span> <span class="small text-muted">Finish → Finish</span>
+                </div>
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <select id="ganttStatusFilter" class="form-select form-select-sm" style="min-width: 140px;">
+                        <option value="all">All statuses</option>
+                        <option value="pending">Pending</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="completed">Completed</option>
+                    </select>
+                    <select id="ganttZoom" class="form-select form-select-sm" style="min-width: 120px;">
+                        <option value="fit">Fit to tasks</option>
+                        <option value="30">Next 30 days</option>
+                        <option value="90">Next 90 days</option>
+                    </select>
+                    <div class="form-check form-check-sm">
+                        <input class="form-check-input" type="checkbox" value="" id="ganttMilestonesOnly">
+                        <label class="form-check-label small" for="ganttMilestonesOnly">
+                            Milestones only
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div id="ganttContainer" class="gantt-container">
+                <svg id="ganttSvg"></svg>
+            </div>
+        </div>
+    </div>
+{% endif %}
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const rawTasks = {{ gantt_tasks | tojson }};
+        const statusFilterSelect = document.getElementById('ganttStatusFilter');
+        const zoomSelect = document.getElementById('ganttZoom');
+        const milestonesOnlyCheckbox = document.getElementById('ganttMilestonesOnly');
+        const svg = document.getElementById('ganttSvg');
+        if (!svg || !rawTasks.length) return;
+
+        fetch('{{ url_for("gantt_dependencies") }}')
+            .then(r => r.json())
+            .then(deps => {
+                renderGantt(rawTasks, deps);
+            })
+            .catch(() => {
+                renderGantt(rawTasks, []);
+            });
+
+        function applyFilters(data) {
+            let filtered = data.slice();
+            const status = statusFilterSelect ? statusFilterSelect.value : 'all';
+            if (status !== 'all') {
+                filtered = filtered.filter(t => t.status === status);
+            }
+            if (milestonesOnlyCheckbox && milestonesOnlyCheckbox.checked) {
+                filtered = filtered.filter(t => t.is_milestone);
+            }
+            return filtered;
+        }
+
+        function renderGantt(taskData, deps) {
+            const paddingLeft = 160;
+            const rowHeight = 26;
+            const barHeight = 14;
+            const now = new Date();
+
+            const filtered = applyFilters(taskData);
+            if (!filtered.length) {
+                svg.innerHTML = '';
+                return;
+            }
+
+            const parsed = filtered.map((t) => {
+                const start = t.start ? new Date(t.start) : new Date(t.end || now);
+                const end = t.end ? new Date(t.end) : new Date(start.getTime() + 24*60*60*1000);
+                return { ...t, start, end };
+            });
+
+            let minDate = new Date(Math.min(...parsed.map(t => t.start.getTime())));
+            let maxDate = new Date(Math.max(...parsed.map(t => t.end.getTime())));
+
+            const zoomMode = zoomSelect ? zoomSelect.value : 'fit';
+            if (zoomMode !== 'fit') {
+                const days = parseInt(zoomMode, 10);
+                const start = new Date();
+                const end = new Date(start.getTime() + days * 24 * 60 * 60 * 1000);
+                minDate = start;
+                maxDate = end;
+            }
+            const totalMs = maxDate - minDate || 1;
+
+            const width = Math.max(800, parsed.length * 120);
+            const height = (parsed.length + 2) * rowHeight;
+            svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+            svg.setAttribute('preserveAspectRatio', 'xMidYMin slice');
+            svg.style.width = '100%';
+            svg.style.height = height + 'px';
+
+            while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+            // grid & labels
+            parsed.forEach((t, index) => {
+                const y = (index + 1) * rowHeight;
+
+                const row = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                row.setAttribute('x', 0);
+                row.setAttribute('y', y - rowHeight + 2);
+                row.setAttribute('width', width);
+                row.setAttribute('height', rowHeight);
+                row.setAttribute('fill', index % 2 === 0 ? '#ffffff' : '#f8f9fa');
+                svg.appendChild(row);
+
+                const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                label.setAttribute('x', 8);
+                label.setAttribute('y', y + 4);
+                label.setAttribute('font-size', '11');
+                label.textContent = t.title;
+                label.setAttribute('data-task-id', t.id);
+                label.classList.add('gantt-task-label');
+                svg.appendChild(label);
+            });
+
+            function dateToX(d) {
+                const ratio = (d - minDate) / totalMs;
+                return paddingLeft + ratio * (width - paddingLeft - 40);
+            }
+
+            const bars = {};
+
+            parsed.forEach((t, index) => {
+                const y = (index + 1) * rowHeight;
+                const xStart = dateToX(t.start);
+                const xEnd = dateToX(t.end);
+                const barWidth = Math.max(8, xEnd - xStart);
+
+                const baseColor = t.is_milestone ? '#6f42c1' :
+                    (t.status === 'completed' ? '#198754' :
+                        (t.status === 'in_progress' ? '#0d6efd' : '#adb5bd'));
+
+                const bar = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                bar.setAttribute('x', xStart);
+                bar.setAttribute('y', y - barHeight / 2);
+                bar.setAttribute('width', barWidth);
+                bar.setAttribute('height', barHeight);
+                bar.setAttribute('rx', 4);
+                bar.setAttribute('fill', baseColor);
+                bar.setAttribute('data-task-id', t.id);
+                bar.classList.add('gantt-bar');
+
+                bar.addEventListener('mouseenter', () => {
+                    showTooltip(t, xStart, y - barHeight);
+                });
+                bar.addEventListener('mouseleave', hideTooltip);
+
+                svg.appendChild(bar);
+                bars[t.id] = { x: xStart, y, t };
+
+                // progress overlay
+                if (t.percent_complete && t.percent_complete > 0) {
+                    const prog = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                    prog.setAttribute('x', xStart);
+                    prog.setAttribute('y', y - barHeight / 2);
+                    prog.setAttribute('width', barWidth * Math.min(t.percent_complete, 100) / 100);
+                    prog.setAttribute('height', barHeight);
+                    prog.setAttribute('rx', 4);
+                    prog.setAttribute('fill', 'rgba(255,255,255,0.35)');
+                    svg.appendChild(prog);
+                }
+
+                // drag handle for dependency creation
+                const handle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                handle.setAttribute('cx', xEnd);
+                handle.setAttribute('cy', y);
+                handle.setAttribute('r', 5);
+                handle.setAttribute('fill', '#343a40');
+                handle.setAttribute('data-task-id', t.id);
+                handle.classList.add('gantt-handle');
+                svg.appendChild(handle);
+            });
+
+            // existing dependencies
+            deps.forEach(d => drawDependency(d, bars));
+
+            // drag-to-create
+            let dragFrom = null;
+
+            svg.addEventListener('mousedown', (e) => {
+                if (e.target.classList.contains('gantt-handle')) {
+                    dragFrom = e.target.getAttribute('data-task-id');
+                }
+            });
+
+            svg.addEventListener('mouseup', (e) => {
+                if (dragFrom && e.target.classList.contains('gantt-bar')) {
+                    const toId = e.target.getAttribute('data-task-id');
+                    if (toId && toId !== dragFrom) {
+                        const type = prompt('Dependency type? (FS, SS, SF, FF)', 'FS') || 'FS';
+                        if (['FS','SS','SF','FF'].includes(type)) {
+                            createDependency(parseInt(dragFrom, 10), parseInt(toId, 10), type);
+                        } else {
+                            alert('Invalid dependency type.');
+                        }
+                    }
+                }
+                dragFrom = null;
+            });
+
+            function drawDependency(dep, barMap) {
+                const from = barMap[dep.predecessor_id];
+                const to = barMap[dep.successor_id];
+                if (!from || !to) return;
+
+                const colorMap = {
+                    'FS': '#6c757d',
+                    'SS': '#0d6efd',
+                    'SF': '#ffc107',
+                    'FF': '#198754',
+                };
+                const color = colorMap[dep.type] || '#6c757d';
+
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', from.x + 4);
+                line.setAttribute('y1', from.y);
+                line.setAttribute('x2', to.x - 4);
+                line.setAttribute('y2', to.y);
+                line.setAttribute('stroke', color);
+                line.setAttribute('stroke-width', 2);
+                line.setAttribute('marker-end', 'url(#arrowhead-' + dep.type + ')');
+                svg.appendChild(line);
+            }
+
+            // arrowhead markers for each type
+            const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+            const colorMap = {
+                'FS': '#6c757d',
+                'SS': '#0d6efd',
+                'SF': '#ffc107',
+                'FF': '#198754',
+            };
+            Object.entries(colorMap).forEach(([type, color]) => {
+                const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+                marker.setAttribute('id', 'arrowhead-' + type);
+                marker.setAttribute('markerWidth', 6);
+                marker.setAttribute('markerHeight', 6);
+                marker.setAttribute('refX', 5);
+                marker.setAttribute('refY', 3);
+                marker.setAttribute('orient', 'auto');
+
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                path.setAttribute('d', 'M0,0 L6,3 L0,6 z');
+                path.setAttribute('fill', color);
+                marker.appendChild(path);
+                defs.appendChild(marker);
+            });
+            svg.appendChild(defs);
+
+            // tooltip
+            const tooltip = document.createElement('div');
+            tooltip.style.position = 'fixed';
+            tooltip.style.pointerEvents = 'none';
+            tooltip.style.padding = '6px 10px';
+            tooltip.style.fontSize = '12px';
+            tooltip.style.background = 'rgba(0,0,0,0.8)';
+            tooltip.style.color = '#fff';
+            tooltip.style.borderRadius = '4px';
+            tooltip.style.zIndex = '9999';
+            tooltip.style.display = 'none';
+            document.body.appendChild(tooltip);
+
+            function showTooltip(task, x, y) {
+                const depsIn = deps.filter(d => d.successor_id === task.id);
+                const depsOut = deps.filter(d => d.predecessor_id === task.id);
+
+                tooltip.innerHTML =
+                    '<strong>' + task.title + '</strong><br>' +
+                    'Status: ' + task.status + '<br>' +
+                    'Progress: ' + (task.percent_complete || 0) + '%<br>' +
+                    'Start: ' + task.start.toLocaleString() + '<br>' +
+                    'End: ' + task.end.toLocaleString() + '<br>' +
+                    'Predecessors: ' + (depsIn.map(d => d.predecessor_id + ' (' + d.type + ')').join(', ') || 'None') + '<br>' +
+                    'Successors: ' + (depsOut.map(d => d.successor_id + ' (' + d.type + ')').join(', ') || 'None');
+
+                const rect = svg.getBoundingClientRect();
+                tooltip.style.left = (rect.left + x + 10) + 'px';
+                tooltip.style.top = (rect.top + y) + 'px';
+                tooltip.style.display = 'block';
+            }
+
+            function hideTooltip() {
+                tooltip.style.display = 'none';
+            }
+        }
+
+        function createDependency(fromId, toId, type) {
+            fetch('{{ url_for("create_gantt_dependency") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({
+                    predecessor_id: fromId,
+                    successor_id: toId,
+                    type: type
+                })
+            }).then(r => r.json()).then(data => {
+                if (!data.success) {
+                    alert('Could not create dependency: ' + (data.error || 'unknown error'));
+                    return;
+                }
+                // For simplicity, reload to show new link
+                window.location.reload();
+            }).catch(() => {
+                alert('Error creating dependency.');
+            });
+        }
+    });
+</script>
+
+{% endblock %}
+

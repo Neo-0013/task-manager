@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}Home - Task Manager{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <div class="col-md-8 text-center">
+        <h1 class="display-4 mb-4">📝 Welcome to Task Manager</h1>
+        <p class="lead mb-5">
+            Organize your tasks efficiently with our smart task management system.
+            Track priorities, set deadlines, and boost your productivity!
+        </p>
+        
+        <div class="row mb-5">
+            <div class="col-md-4">
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <h3>✅</h3>
+                        <h5>Track Tasks</h5>
+                        <p>Manage all your tasks in one place</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <h3>🎯</h3>
+                        <h5>Set Priorities</h5>
+                        <p>Focus on what matters most</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <h3>📊</h3>
+                        <h5>Track Progress</h5>
+                        <p>See your accomplishments</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="d-grid gap-2 d-md-block">
+            <a href="{{ url_for('register') }}" class="btn btn-primary btn-lg px-5 me-2">
+                Get Started
+            </a>
+            <a href="{{ url_for('login') }}" class="btn btn-outline-primary btn-lg px-5">
+                Login
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
